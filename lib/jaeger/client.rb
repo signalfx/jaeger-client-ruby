@@ -29,7 +29,8 @@ module Jaeger
                    flush_interval: DEFAULT_FLUSH_INTERVAL,
                    sampler: Samplers::Const.new(true),
                    logger: Logger.new(STDOUT),
-                   sender: nil)
+                   sender: nil,
+                   propagation_default: nil)
       encoder = Encoders::ThriftEncoder.new(service_name: service_name)
 
       if sender.nil?
@@ -37,7 +38,7 @@ module Jaeger
       end
 
       reporter = AsyncReporter.create(sender: sender, flush_interval: flush_interval)
-      Tracer.new(reporter, sampler)
+      Tracer.new(reporter, sampler, propagation_default)
     end
   end
 end

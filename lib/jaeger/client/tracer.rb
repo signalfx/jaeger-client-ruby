@@ -3,9 +3,10 @@
 module Jaeger
   module Client
     class Tracer
-      def initialize(reporter, sampler)
+      def initialize(reporter, sampler, propagation_default)
         @reporter = reporter
         @sampler = sampler
+        @propagation_default = propagation_default # used to override any specified propagation format
         @scope_manager = ScopeManager.new
       end
 
@@ -127,7 +128,7 @@ module Jaeger
       # @param format [OpenTracing::FORMAT_TEXT_MAP, OpenTracing::FORMAT_BINARY, OpenTracing::FORMAT_RACK]
       # @param carrier [Carrier] A carrier object of the type dictated by the specified `format`
       def inject(span_context, format, carrier)
-        case format
+        case @propagation_default || format
         when OpenTracing::FORMAT_TEXT_MAP, OpenTracing::FORMAT_RACK
           carrier['uber-trace-id'] = [
             span_context.trace_id.to_s(16),
@@ -146,7 +147,7 @@ module Jaeger
       # @param carrier [Carrier] A carrier object of the type dictated by the specified `format`
       # @return [SpanContext] the extracted SpanContext or nil if none could be found
       def extract(format, carrier)
-        case format
+        case @propagation_default || format
         when OpenTracing::FORMAT_TEXT_MAP
           parse_context(carrier['uber-trace-id'])
         when OpenTracing::FORMAT_RACK
