@@ -4,7 +4,7 @@ module Jaeger
   module Client
 
     # Format for Zipkin's B3 propagation
-    FORMAT_B3 = 4
+    FORMAT_B3 = 83 # looks like B3
 
     class Tracer
       def initialize(reporter, sampler)
