@@ -30,7 +30,7 @@ module Jaeger
                    sampler: Samplers::Const.new(true),
                    logger: Logger.new(STDOUT),
                    sender: nil,
-                   propagation_default: nil)
+                   propagation_override: nil)
       encoder = Encoders::ThriftEncoder.new(service_name: service_name)
 
       if sender.nil?
@@ -38,7 +38,7 @@ module Jaeger
       end
 
       reporter = AsyncReporter.create(sender: sender, flush_interval: flush_interval)
-      Tracer.new(reporter, sampler, propagation_default)
+      Tracer.new(reporter, sampler, propagation_override: propagation_override)
     end
   end
 end
