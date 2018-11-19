@@ -12,6 +12,7 @@ module Jaeger
 
         # start flush thread
         Thread.new do
+          Thread.current.thread_variable_set(:tracer_reporter, true)
           loop do
             reporter.flush
             sleep(flush_interval)

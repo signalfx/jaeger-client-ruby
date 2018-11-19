@@ -13,9 +13,6 @@ module Jaeger
         @uri.query = 'format=jaeger.thrift'
 
         @transport = ::Thrift::HTTPClientTransport.new(@uri.to_s)
-
-        # add a header to let others know to ignore this request
-        headers['opentracing-ignore'] = 'true'
         @transport.add_headers(headers)
 
         @serializer = ::Thrift::Serializer.new
