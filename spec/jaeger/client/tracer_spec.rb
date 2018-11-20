@@ -185,17 +185,6 @@ describe Jaeger::Client::Tracer do
         )
       end
     end
-
-    context 'when FORMAT_B3' do
-      before { tracer.inject(span_context, Jaeger::Client::FORMAT_B3, carrier) }
-
-      it 'sets B3 headers' do
-        expect(carrier['X-B3-TraceId']).to eq(span_context.trace_id.to_s(16))
-        expect(carrier['X-B3-SpanId']).to eq(span_context.span_id.to_s(16))
-        expect(carrier['X-B3-ParentSpanId']).to eq(span_context.parent_id.to_s(16))
-        expect(carrier['X-B3-Sampled']).to eq(span_context.flags.to_s(16))
-      end
-    end
   end
 
   describe '#extract' do
@@ -318,58 +307,6 @@ describe Jaeger::Client::Tracer do
 
         it 'returns nil' do
           expect(span_context).to eq(nil)
-        end
-      end
-    end
-
-    context 'when FORMAT_B3' do
-      context 'when headers are in B3 format' do
-        let(:carrier) { { 'X-B3-TraceId' => trace_id,
-                          'X-B3-SpanId' => span_id,
-                          'X-B3-ParentSpanId' => parent_id,
-                          'X-B3-Sampled' => flags } }
-        let(:span_context) { tracer.extract(Jaeger::Client::FORMAT_B3, carrier) }
-
-        it 'populates the span context correctly' do
-          expect(span_context.trace_id).to eq(trace_id.to_i(16))
-          expect(span_context.span_id).to eq(span_id.to_i(16))
-          expect(span_context.parent_id).to eq(parent_id.to_i(16))
-          expect(span_context.flags).to eq(flags.to_i(16))
-        end
-
-        context 'when headers are lower case' do
-          let(:carrier_lowercase) { Net::HTTPResponse.new({}, 200, "") }
-
-          before do
-            carrier_lowercase['x-b3-traceid'] = trace_id
-            carrier_lowercase['x-b3-spanid'] = span_id
-            carrier_lowercase['x-b3-parentspanid'] = parent_id
-            carrier_lowercase['x-b3-sampled'] = flags
-          end
-
-          let(:span_context_from_lowercase) { tracer.extract(Jaeger::Client::FORMAT_B3, carrier_lowercase) }
-
-          it 'populates the span context correctly' do
-            expect(span_context_from_lowercase.trace_id).to eq(trace_id.to_i(16))
-            expect(span_context_from_lowercase.span_id).to eq(span_id.to_i(16))
-            expect(span_context_from_lowercase.parent_id).to eq(parent_id.to_i(16))
-            expect(span_context_from_lowercase.flags).to eq(flags.to_i(16))
-          end
-        end
-      end
-
-      context 'when headers are transformed by Rack' do
-        let(:carrier) { { 'HTTP_X_B3_TRACEID' => trace_id,
-                          'HTTP_X_B3_SPANID' => span_id,
-                          'HTTP_X_B3_PARENTSPANID' => parent_id,
-                          'HTTP_X_B3_SAMPLED' => flags } }
-        let(:span_context) { tracer.extract(Jaeger::Client::FORMAT_B3, carrier) }
-
-        it 'populates the span context correctly' do
-          expect(span_context.trace_id).to eq(trace_id.to_i(16))
-          expect(span_context.span_id).to eq(span_id.to_i(16))
-          expect(span_context.parent_id).to eq(parent_id.to_i(16))
-          expect(span_context.flags).to eq(flags.to_i(16))
         end
       end
     end
