@@ -7,6 +7,7 @@ require 'jaeger/thrift/agent'
 require 'logger'
 
 require_relative 'client/tracer'
+require_relative 'client/tracer_b3'
 require_relative 'client/span'
 require_relative 'client/span_context'
 require_relative 'client/scope'
@@ -29,7 +30,8 @@ module Jaeger
                    flush_interval: DEFAULT_FLUSH_INTERVAL,
                    sampler: Samplers::Const.new(true),
                    logger: Logger.new(STDOUT),
-                   sender: nil)
+                   sender: nil,
+                   propagate_b3: false)
       encoder = Encoders::ThriftEncoder.new(service_name: service_name)
 
       if sender.nil?
@@ -37,7 +39,11 @@ module Jaeger
       end
 
       reporter = AsyncReporter.create(sender: sender, flush_interval: flush_interval)
-      Tracer.new(reporter, sampler)
+      if propagate_b3
+        TracerB3.new(reporter, sampler)
+      else
+        Tracer.new(reporter, sampler)
+      end
     end
   end
 end

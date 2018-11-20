@@ -1,0 +1,225 @@
+require 'spec_helper'
+
+describe Jaeger::Client::TracerB3 do
+  let(:tracer) { described_class.new(reporter, sampler) }
+  let(:reporter) { instance_spy(Jaeger::Client::AsyncReporter) }
+  let(:sampler) { Jaeger::Client::Samplers::Const.new(true) }
+
+  describe '#inject' do
+    let(:operation_name) { 'operator-name' }
+    let(:span) { tracer.start_span(operation_name) }
+    let(:span_context) { span.context }
+    let(:carrier) { {} }
+
+    context 'when FORMAT_TEXT_MAP' do
+      before { tracer.inject(span_context, OpenTracing::FORMAT_TEXT_MAP, carrier) }
+
+      it 'sets trace information' do
+        expect(carrier['x-b3-traceid']).to eq(span_context.trace_id.to_s(16))
+        expect(carrier['x-b3-spanid']).to eq(span_context.span_id.to_s(16))
+        expect(carrier['x-b3-parentspanid']).to eq(span_context.parent_id.to_s(16))
+        expect(carrier['x-b3-sampled']).to eq(span_context.flags.to_s(16))
+      end
+    end
+
+    context 'when FORMAT_RACK' do
+      before { tracer.inject(span_context, OpenTracing::FORMAT_RACK, carrier) }
+
+      it 'sets trace information' do
+        expect(carrier['HTTP_X_B3_TRACEID']).to eq(span_context.trace_id.to_s(16))
+        expect(carrier['HTTP_X_B3_SPANID']).to eq(span_context.span_id.to_s(16))
+        expect(carrier['HTTP_X_B3_PARENTSPANID']).to eq(span_context.parent_id.to_s(16))
+        expect(carrier['HTTP_X_B3_SAMPLED']).to eq(span_context.flags.to_s(16))
+      end
+    end
+  end
+
+  describe '#extract' do
+    let(:hexa_max_uint64) { 'ff' * 8 }
+    let(:max_uint64) { 2**64 - 1 }
+
+    let(:operation_name) { 'operator-name' }
+    let(:trace_id) { '58a515c97fd61fd7' }
+    let(:parent_id) { '8e5a8c5509c8dcc1' }
+    let(:span_id) { 'aba8be8d019abed2' }
+    let(:flags) { '1' }
+
+    context 'when FORMAT_TEXT_MAP' do
+      let(:carrier) { Net::HTTPResponse.new({}, 200, "") }
+
+      before do
+        carrier['x-b3-traceid'] = trace_id
+        carrier['x-b3-spanid'] = span_id
+        carrier['x-b3-parentspanid'] = parent_id
+        carrier['x-b3-sampled'] = flags
+      end
+
+      let(:span_context) { tracer.extract(OpenTracing::FORMAT_TEXT_MAP, carrier) }
+
+      it 'has flags' do
+        expect(span_context.flags).to eq(flags.to_i(16))
+      end
+
+      context 'when trace-id is a max uint64' do
+        let(:trace_id) { hexa_max_uint64 }
+
+        it 'interprets it correctly' do
+          expect(span_context.trace_id).to eq(max_uint64)
+        end
+      end
+
+      context 'when parent-id is a max uint64' do
+        let(:parent_id) { hexa_max_uint64 }
+
+        it 'interprets it correctly' do
+          expect(span_context.parent_id).to eq(max_uint64)
+        end
+      end
+
+      context 'when span-id is a max uint64' do
+        let(:span_id) { hexa_max_uint64 }
+
+        it 'interprets it correctly' do
+          expect(span_context.span_id).to eq(max_uint64)
+        end
+      end
+
+      context 'when parent-id is 0' do
+        let(:parent_id) { '0' }
+
+        it 'sets parent_id to 0' do
+          expect(span_context.parent_id).to eq(0)
+        end
+      end
+
+      context 'when trace-id missing' do
+        let(:trace_id) { nil }
+
+        it 'returns nil' do
+          expect(span_context).to eq(nil)
+        end
+      end
+
+      context 'when span-id missing' do
+        let(:span_id) { nil }
+
+        it 'returns nil' do
+          expect(span_context).to eq(nil)
+        end
+      end
+    end
+
+    context 'when FORMAT_RACK' do
+      let(:carrier) { { 'HTTP_X_B3_TRACEID' => trace_id,
+                        'HTTP_X_B3_SPANID' => span_id,
+                        'HTTP_X_B3_PARENTSPANID' => parent_id,
+                        'HTTP_X_B3_SAMPLED' => flags } }
+
+      let(:span_context) { tracer.extract(OpenTracing::FORMAT_RACK, carrier) }
+
+      it 'has flags' do
+        expect(span_context.flags).to eq(flags.to_i(16))
+      end
+
+      context 'when trace-id is a max uint64' do
+        let(:trace_id) { hexa_max_uint64 }
+
+        it 'interprets it correctly' do
+          expect(span_context.trace_id).to eq(max_uint64)
+        end
+      end
+
+      context 'when parent-id is a max uint64' do
+        let(:parent_id) { hexa_max_uint64 }
+
+        it 'interprets it correctly' do
+          expect(span_context.parent_id).to eq(max_uint64)
+        end
+      end
+
+      context 'when span-id is a max uint64' do
+        let(:span_id) { hexa_max_uint64 }
+
+        it 'interprets it correctly' do
+          expect(span_context.span_id).to eq(max_uint64)
+        end
+      end
+
+      context 'when parent-id is 0' do
+        let(:parent_id) { '0' }
+
+        it 'sets parent_id to 0' do
+          expect(span_context.parent_id).to eq(0)
+        end
+      end
+
+      context 'when trace-id is missing' do
+        let(:trace_id) { nil }
+
+        it 'returns nil' do
+          expect(span_context).to eq(nil)
+        end
+      end
+
+      context 'when span-id is missing' do
+        let(:span_id) { nil }
+
+        it 'returns nil' do
+          expect(span_context).to eq(nil)
+        end
+      end
+    end
+
+    # context 'when FORMAT_B3' do
+    #   context 'when headers are in B3 format' do
+    #     let(:carrier) { { 'X-B3-TraceId' => trace_id,
+    #                       'X-B3-SpanId' => span_id,
+    #                       'X-B3-ParentSpanId' => parent_id,
+    #                       'X-B3-Sampled' => flags } }
+    #     let(:span_context) { tracer.extract(Jaeger::Client::FORMAT_B3, carrier) }
+
+    #     it 'populates the span context correctly' do
+    #       expect(span_context.trace_id).to eq(trace_id.to_i(16))
+    #       expect(span_context.span_id).to eq(span_id.to_i(16))
+    #       expect(span_context.parent_id).to eq(parent_id.to_i(16))
+    #       expect(span_context.flags).to eq(flags.to_i(16))
+    #     end
+
+    #     context 'when headers are lower case' do
+    #       let(:carrier_lowercase) { Net::HTTPResponse.new({}, 200, "") }
+
+    #       before do
+    #         carrier_lowercase['x-b3-traceid'] = trace_id
+    #         carrier_lowercase['x-b3-spanid'] = span_id
+    #         carrier_lowercase['x-b3-parentspanid'] = parent_id
+    #         carrier_lowercase['x-b3-sampled'] = flags
+    #       end
+
+    #       let(:span_context_from_lowercase) { tracer.extract(Jaeger::Client::FORMAT_B3, carrier_lowercase) }
+
+    #       it 'populates the span context correctly' do
+    #         expect(span_context_from_lowercase.trace_id).to eq(trace_id.to_i(16))
+    #         expect(span_context_from_lowercase.span_id).to eq(span_id.to_i(16))
+    #         expect(span_context_from_lowercase.parent_id).to eq(parent_id.to_i(16))
+    #         expect(span_context_from_lowercase.flags).to eq(flags.to_i(16))
+    #       end
+    #     end
+    #   end
+
+    #   context 'when headers are transformed by Rack' do
+    #     let(:carrier) { { 'HTTP_X_B3_TRACEID' => trace_id,
+    #                       'HTTP_X_B3_SPANID' => span_id,
+    #                       'HTTP_X_B3_PARENTSPANID' => parent_id,
+    #                       'HTTP_X_B3_SAMPLED' => flags } }
+    #     let(:span_context) { tracer.extract(Jaeger::Client::FORMAT_B3, carrier) }
+
+    #     it 'populates the span context correctly' do
+    #       expect(span_context.trace_id).to eq(trace_id.to_i(16))
+    #       expect(span_context.span_id).to eq(span_id.to_i(16))
+    #       expect(span_context.parent_id).to eq(parent_id.to_i(16))
+    #       expect(span_context.flags).to eq(flags.to_i(16))
+    #     end
+    #   end
+    # end
+  end
+end
