@@ -2,10 +2,6 @@
 
 module Jaeger
   module Client
-
-    # Format for Zipkin's B3 propagation
-    FORMAT_B3 = 83 # looks like B3
-
     class Tracer
       def initialize(reporter, sampler)
         @reporter = reporter
@@ -139,8 +135,6 @@ module Jaeger
             span_context.parent_id.to_s(16),
             span_context.flags.to_s(16)
           ].join(':')
-        when Jaeger::Client::FORMAT_B3
-          inject_format_b3(span_context, carrier)
         else
           warn "Jaeger::Client with format #{format} is not supported yet"
         end
@@ -157,8 +151,6 @@ module Jaeger
           parse_context(carrier['uber-trace-id'])
         when OpenTracing::FORMAT_RACK
           parse_context(carrier['HTTP_UBER_TRACE_ID'])
-        when Jaeger::Client::FORMAT_B3
-          parse_context_b3(carrier)
         else
           warn "Jaeger::Client with format #{format} is not supported yet"
           nil
@@ -217,39 +209,6 @@ module Jaeger
 
         active_scope = @scope_manager.active
         active_scope.span.context if active_scope
-      end
-
-      def inject_format_b3(span_context, carrier)
-        carrier['X-B3-TraceId'] = span_context.trace_id.to_s(16)
-        carrier['X-B3-SpanId'] = span_context.span_id.to_s(16)
-        carrier['X-B3-ParentSpanId'] = span_context.parent_id.to_s(16)
-        carrier['X-B3-Sampled'] = span_context.flags.to_s(16)
-      end
-
-      def parse_context_b3(carrier)
-        trace_id = span_id = parent_id = flags = nil
-
-        if carrier.key?('HTTP_X_B3_TRACEID') # if the headers have been transformed by rack
-          trace_id = TraceId.base16_hex_id_to_uint64(carrier['HTTP_X_B3_TRACEID'])
-          span_id = TraceId.base16_hex_id_to_uint64(carrier['HTTP_X_B3_SPANID'])
-          parent_id = TraceId.base16_hex_id_to_uint64(carrier['HTTP_X_B3_PARENTSPANID'])
-          flags = TraceId.base16_hex_id_to_uint64(carrier['HTTP_X_B3_SAMPLED'])
-        elsif carrier.key?('X-B3-TraceId') # regular B3 headers
-          trace_id = TraceId.base16_hex_id_to_uint64(carrier['X-B3-TraceId'])
-          span_id = TraceId.base16_hex_id_to_uint64(carrier['X-B3-SpanId'])
-          parent_id = TraceId.base16_hex_id_to_uint64(carrier['X-B3-ParentSpanId'])
-          flags = TraceId.base16_hex_id_to_uint64(carrier['X-B3-Sampled'])
-        end
-
-        return nil if span_id.nil? || span_id.zero?
-        return nil if trace_id.nil? || trace_id.zero?
-
-        SpanContext.new(
-          trace_id: trace_id,
-          parent_id: parent_id,
-          span_id: span_id,
-          flags: flags
-        )
       end
     end
   end
