@@ -10,16 +10,11 @@ module Jaeger
 
       def inject(span_context, format, carrier)
         case format
-        when OpenTracing::FORMAT_TEXT_MAP
+        when OpenTracing::FORMAT_TEXT_MAP, OpenTracing::FORMAT_RACK
           carrier['x-b3-traceid'] = span_context.trace_id.to_s(16)
           carrier['x-b3-spanid'] = span_context.span_id.to_s(16)
           carrier['x-b3-parentspanid'] = span_context.parent_id.to_s(16)
           carrier['x-b3-sampled'] = span_context.flags.to_s(16)
-        when OpenTracing::FORMAT_RACK
-          carrier['HTTP_X_B3_TRACEID'] = span_context.trace_id.to_s(16)
-          carrier['HTTP_X_B3_SPANID'] = span_context.span_id.to_s(16)
-          carrier['HTTP_X_B3_PARENTSPANID'] = span_context.parent_id.to_s(16)
-          carrier['HTTP_X_B3_SAMPLED'] = span_context.flags.to_s(16)
         else
           warn "Jaeger::Client with B3 propagation in format #{format} is not supported yet"
         end
