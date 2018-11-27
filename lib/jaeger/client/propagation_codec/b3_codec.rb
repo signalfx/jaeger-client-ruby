@@ -13,7 +13,13 @@ module Jaeger
           carrier['x-b3-traceid'] = span_context.trace_id.to_s(16)
           carrier['x-b3-spanid'] = span_context.span_id.to_s(16)
           carrier['x-b3-parentspanid'] = span_context.parent_id.to_s(16)
-          carrier['x-b3-sampled'] = span_context.flags.to_s(16)
+
+          # flags (for debug) and sampled headers are mutually exclusive
+          if span_context.flags == Jaeger::Client::SpanContext::Flags::DEBUG
+            carrier['x-b3-flags'] = "1"
+          else
+            carrier['x-b3-sampled'] = span_context.flags.to_s(16)
+          end
         end
 
         # Extract a SpanContext from a given carrier in the Text Map format
@@ -24,7 +30,7 @@ module Jaeger
           trace_id = TraceId.base16_hex_id_to_uint64(carrier['x-b3-traceid'])
           span_id = TraceId.base16_hex_id_to_uint64(carrier['x-b3-spanid'])
           parent_id = TraceId.base16_hex_id_to_uint64(carrier['x-b3-parentspanid'])
-          flags = TraceId.base16_hex_id_to_uint64(carrier['x-b3-sampled'])
+          flags = parse_flags(carrier['x-b3-flags'], carrier['x-b3-sampled'])
 
           return nil if span_id.nil? || trace_id.nil?
           return nil if span_id.zero? || trace_id.zero?
@@ -45,7 +51,7 @@ module Jaeger
           trace_id = TraceId.base16_hex_id_to_uint64(carrier['HTTP_X_B3_TRACEID'])
           span_id = TraceId.base16_hex_id_to_uint64(carrier['HTTP_X_B3_SPANID'])
           parent_id = TraceId.base16_hex_id_to_uint64(carrier['HTTP_X_B3_PARENTSPANID'])
-          flags = TraceId.base16_hex_id_to_uint64(carrier['HTTP_X_B3_SAMPLED'])
+          flags = parse_flags(carrier['HTTP_X_B3_FLAGS'], carrier['HTTP_X_B3_SAMPLED'])
 
           return nil if span_id.nil? || trace_id.nil?
           return nil if span_id.zero? || trace_id.zero?
@@ -56,6 +62,17 @@ module Jaeger
             span_id: span_id,
             flags: flags
           )
+        end
+
+        private
+
+        # if the flags header is '1' then the sampled header should not be present
+        def parse_flags(flags_header, sampled_header)
+          if flags_header == '1'
+            Jaeger::Client::SpanContext::Flags::DEBUG
+          else
+            TraceId.base16_hex_id_to_uint64(sampled_header)
+          end
         end
       end
     end
