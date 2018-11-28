@@ -40,6 +40,24 @@ describe Jaeger::Client::PropagationCodec::B3Codec do
         expect(carrier).not_to have_key 'x-b3-sampled'
       end
     end
+
+    context 'when span context IDs are longer than 16 characters' do
+      before do
+        # mock fields, since they are read only
+        allow(span_context).to receive(:trace_id).and_return(0xFFFFFFFFFFFFFFFFF)
+        allow(span_context).to receive(:span_id).and_return(0xFFFFFFFFFFFFFFFFF)
+        allow(span_context).to receive(:parent_id).and_return(0xFFFFFFFFFFFFFFFFF)
+
+        codec.inject(span_context, carrier)
+      end
+
+      it 'pads the hex id strings to 32 characters' do
+        expect(carrier['x-b3-traceid'].length).to eq 32
+        expect(carrier['x-b3-spanid'].length).to eq 32
+        expect(carrier['x-b3-parentspanid'].length).to eq 32
+      end
+
+    end
   end
 
   context 'when extracting' do

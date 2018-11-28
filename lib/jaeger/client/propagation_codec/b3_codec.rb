@@ -10,11 +10,9 @@ module Jaeger
         # @param span_context [SpanContext]
         # @param carrier [carrier] A carrier object of type TEXT_MAP or RACK
         def inject(span_context, carrier)
-          # to_s(16) converts to a hex string
-          # rjust(16, '0') pads the string to 16 characters with '0's
-          carrier['x-b3-traceid'] = span_context.trace_id.to_s(16).rjust(16, '0')
-          carrier['x-b3-spanid'] = span_context.span_id.to_s(16).rjust(16, '0')
-          carrier['x-b3-parentspanid'] = span_context.parent_id.to_s(16).rjust(16, '0')
+          carrier['x-b3-traceid'] = to_hex(span_context.trace_id)
+          carrier['x-b3-spanid'] = to_hex(span_context.span_id)
+          carrier['x-b3-parentspanid'] = to_hex(span_context.parent_id)
 
           # flags (for debug) and sampled headers are mutually exclusive
           if span_context.flags == Jaeger::Client::SpanContext::Flags::DEBUG
@@ -67,6 +65,20 @@ module Jaeger
         end
 
         private
+
+        # Convert an integer id into a 0 padded hex string.
+        # If the string is shorter than 16 characters, it will be padded to 16.
+        # If it is longer than 16 characters, it is padded to 32.
+        def to_hex(id)
+          hex_str = id.to_s(16)
+
+          # pad the string with '0's to 16 or 32 characters
+          if hex_str.length > 16
+            hex_str.rjust(32, '0')
+          else
+            hex_str.rjust(16, '0')
+          end
+        end
 
         # if the flags header is '1' then the sampled header should not be present
         def parse_flags(flags_header, sampled_header)
