@@ -16,9 +16,9 @@ describe Jaeger::Client::PropagationCodec::B3Codec do
       before { codec.inject(span_context, carrier) }
 
       it 'sets trace information' do
-        expect(carrier['x-b3-traceid']).to eq(span_context.trace_id.to_s(16))
-        expect(carrier['x-b3-spanid']).to eq(span_context.span_id.to_s(16))
-        expect(carrier['x-b3-parentspanid']).to eq(span_context.parent_id.to_s(16))
+        expect(carrier['x-b3-traceid']).to eq(span_context.trace_id.to_s(16).rjust(16, '0'))
+        expect(carrier['x-b3-spanid']).to eq(span_context.span_id.to_s(16).rjust(16, '0'))
+        expect(carrier['x-b3-parentspanid']).to eq(span_context.parent_id.to_s(16).rjust(16, '0'))
         expect(carrier['x-b3-sampled']).to eq(span_context.flags.to_s(16))
       end
     end

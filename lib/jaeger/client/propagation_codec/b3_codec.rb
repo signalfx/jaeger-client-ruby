@@ -10,9 +10,11 @@ module Jaeger
         # @param span_context [SpanContext]
         # @param carrier [carrier] A carrier object of type TEXT_MAP or RACK
         def inject(span_context, carrier)
-          carrier['x-b3-traceid'] = span_context.trace_id.to_s(16)
-          carrier['x-b3-spanid'] = span_context.span_id.to_s(16)
-          carrier['x-b3-parentspanid'] = span_context.parent_id.to_s(16)
+          # to_s(16) converts to a hex string
+          # rjust(16, '0') pads the string to 16 characters with '0's
+          carrier['x-b3-traceid'] = span_context.trace_id.to_s(16).rjust(16, '0')
+          carrier['x-b3-spanid'] = span_context.span_id.to_s(16).rjust(16, '0')
+          carrier['x-b3-parentspanid'] = span_context.parent_id.to_s(16).rjust(16, '0')
 
           # flags (for debug) and sampled headers are mutually exclusive
           if span_context.flags == Jaeger::Client::SpanContext::Flags::DEBUG
